@@ -1,0 +1,110 @@
+[
+  {
+    "id": "us_20k_300",
+    "label": "Most Sold Product - 🇺🇸 US 20k Account",
+    "description": "Non-Verified",
+    "region": "US",
+    "type": "20k Non-Verified",
+    "price": 300,
+    "featured": true
+  },
+  {
+    "id": "us_20k_350",
+    "label": "🇺🇸 US 20k Account",
+    "description": "Verified",
+    "region": "US",
+    "type": "20k Verified",
+    "price": 350,
+    "featured": false
+  },
+  {
+    "id": "us_10k_200",
+    "label": "🇺🇸 US 10k Account",
+    "description": "Non-Verified",
+    "region": "US",
+    "type": "10k Non-Verified",
+    "price": 200,
+    "featured": false
+  },
+  {
+    "id": "us_10k_250",
+    "label": "🇺🇸 US 10k Account",
+    "description": "Verified",
+    "region": "US",
+    "type": "10k Verified",
+    "price": 250,
+    "featured": false
+  },
+  {
+    "id": "us_30k_400",
+    "label": "🇺🇸 US 30k Account",
+    "description": "Non-Verified",
+    "region": "US",
+    "type": "30k Non-Verified",
+    "price": 400,
+    "featured": false
+  },
+  {
+    "id": "us_30k_450",
+    "label": "🇺🇸 US 30k Account",
+    "description": "Verified",
+    "region": "US",
+    "type": "30k Verified",
+    "price": 450,
+    "featured": false
+  },
+  {
+    "id": "us_40k_475",
+    "label": "🇺🇸 US 40k Account",
+    "description": "Non-Verified",
+    "region": "US",
+    "type": "40k Non-Verified",
+    "price": 475,
+    "featured": false
+  },
+  {
+    "id": "us_40k_500",
+    "label": "🇺🇸 US 40k Account",
+    "description": "Verified",
+    "region": "US",
+    "type": "40k Verified",
+    "price": 500,
+    "featured": false
+  },
+  {
+    "id": "uk_10k_150",
+    "label": "🇬🇧 UK 10k Account",
+    "description": "Non-Verified",
+    "region": "UK",
+    "type": "10k Non-Verified",
+    "price": 150,
+    "featured": false
+  },
+  {
+    "id": "uk_10k_200",
+    "label": "🇬🇧 UK 10k Account",
+    "description": "Verified",
+    "region": "UK",
+    "type": "10k Verified",
+    "price": 200,
+    "featured": false
+  },
+  {
+    "id": "eu_standard_200",
+    "label": "🇪🇺 EU Account",
+    "description": "Germany/France",
+    "region": "EU",
+    "type": "Germany/France",
+    "price": 200,
+    "featured": false
+  },
+  {
+    "id": "link_bio_30",
+    "label": "🔗 Non-TTS Accounts",
+    "description": "Non-Affiliate Accounts",
+    "region": "Non-TTS",
+    "type": "Non-Affiliate",
+    "price": 30,
+    "featured": false
+  }
+]

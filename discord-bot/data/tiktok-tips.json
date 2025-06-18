@@ -1,0 +1,44 @@
+{
+  "title": "📱 TikTok Account Usage Tips",
+  "color": "#FF0050",
+  "sections": {
+    "security": {
+      "title": "🔒 Security Tips After Purchase",
+      "content": [
+        "⏰ **Wait 72 hours** - TikTok needs time to recognize your device as trustworthy",
+        "🌐 **IP Address Changes** - Avoid follows, likes, and posts for a week after IP change",
+        "👤 **Username Changes** - Don't change username for a week (looks suspicious to TikTok)",
+        "📱 **Follow these steps to avoid account restrictions**"
+      ]
+    },
+    "seller": {
+      "title": "🛍️ TikTok Shop for Sellers",
+      "content": [
+        "1️⃣ Go to TikTok Shop for Seller and click 'Sign up with TikTok account'",
+        "📄 Upload your USA passport or driving license for verification",
+        "🏪 Set up your remote website or shop within TikTok Shop",
+        "📦 Add products that you think will generate sales"
+      ]
+    },
+    "creator": {
+      "title": "🎬 TikTok Shop for Creators",
+      "content": [
+        "📝 Apply for TikTok Shop Creator program with your account info",
+        "⚠️ **Important**: Application may be rejected first time due to new IP/device",
+        "⏳ Wait 24 hours, then reapply 3-4 times until accepted",
+        "🔑 This process must be done from YOUR phone/location for account security"
+      ]
+    },
+    "resources": {
+      "title": "📚 Helpful Resources",
+      "content": [
+        "📹 **Seller Setup Tutorial**: https://youtu.be/V75pUMay-kM",
+        "📹 **Additional Seller Guide**: https://youtu.be/ZTYFH01elWY",
+        "📹 **Creator Program Guide**: https://youtu.be/MdEgogmUot8",
+        "📖 **Viral Content Guide**: https://b9talentagency.notion.site/TikTok-Guide-fdcf2104313a4eef92c3c62d15fff891"
+      ]
+    }
+  },
+  "footer": "Creatok Support Team",
+  "mentionEveryone": false
+}

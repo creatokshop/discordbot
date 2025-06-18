@@ -1,0 +1,68 @@
+{
+  "title": "🔥 CREATOK PRICING",
+  "color": "#00D084",
+  "footer": "Creatok Sales Team • All prices in USD",
+  "mentionEveryone": false,
+  "products": [
+    {
+      "label": "Most Sold Product - 🇺🇸 US 20k Account",
+      "description": "Non-Verified - $300",
+      "value": "us_20k_300"
+    },
+    {
+      "label": "🇺🇸 US 20k Account",
+      "description": "Verified - $350",
+      "value": "us_20k_350"
+    },
+    {
+      "label": "🇺🇸 US 10k Account",
+      "description": "Non-Verified - $200",
+      "value": "us_10k_200"
+    },
+    {
+      "label": "🇺🇸 US 10k Account",
+      "description": "Verified - $250",
+      "value": "us_10k_250"
+    },
+    {
+      "label": "🇺🇸 US 30k Account",
+      "description": "Non-Verified - $400",
+      "value": "us_30k_400"
+    },
+    {
+      "label": "🇺🇸 US 30k Account",
+      "description": "Verified - $450",
+      "value": "us_30k_450"
+    },
+    {
+      "label": "🇺🇸 US 40k Account",
+      "description": "Non-Verified - $475",
+      "value": "us_40k_475"
+    },
+    {
+      "label": "🇺🇸 US 40k Account",
+      "description": "Verified - $500",
+      "value": "us_40k_500"
+    },
+    {
+      "label": "🇬🇧 UK 10k Account",
+      "description": "Non-Verified - $150",
+      "value": "uk_10k_150"
+    },
+    {
+      "label": "🇬🇧 UK 10k Account",
+      "description": "Verified - $200",
+      "value": "uk_10k_200"
+    },
+    {
+      "label": "🇪🇺 EU Account",
+      "description": "Germany/France - $200",
+      "value": "eu_standard_200"
+    },
+    {
+      "label": "🔗 Non-TTS Accounts",
+      "description": "Non-Affiliate Accounts - $30",
+      "value": "link_bio_30"
+    }
+  ]
+}

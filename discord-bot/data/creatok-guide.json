@@ -1,0 +1,109 @@
+{
+  "steps": {
+    "verification": {
+      "title": "✅ STEP 1: VERIFICATION OPTIONS",
+      "emoji": "📱",
+      "color": "#FF5733",
+      "content": [
+        "**Choose your preferred account type:**",
+        "",
+        "**NON-VERIFIED ACCOUNTS:**",
+        "▫️ Region-locked to country of origin",
+        "▫️ Requires matching VPN for access",
+        "▫️ Lower cost option",
+        "▫️ Standard TikTok features",
+        "",
+        "**VERIFIED SYSTEM BYPASS:**",
+        "▫️ Our proprietary APK solution",
+        "▫️ Global access from any location",
+        "▫️ No VPN required",
+        "▫️ All verification benefits maintained",
+        "▫️ Regular updates provided"
+      ]
+    },
+    "region": {
+      "title": "🌎 STEP 2: SELECT YOUR REGION",
+      "emoji": "🌍",
+      "color": "#33FF57",
+      "content": [
+        "**🇺🇸 US ACCOUNTS:**",
+        "▫️ Best for US-targeted content",
+        "▫️ Higher monetization potential",
+        "▫️ Full TikTok Shop access",
+        "▫️ Full Creativity Rewards Program",
+        "",
+        "**🇬🇧 UK ACCOUNTS:**",
+        "▫️ Optimized for UK/European market",
+        "▫️ Strong e-commerce integration",
+        "▫️ Full TikTok Shop access",
+        "▫️ Full Creativity Rewards Program",
+        "",
+        "**🇪🇺 EU ACCOUNTS:**",
+        "▫️ German/French options",
+        "▫️ Growing market presence",
+        "▫️ Full TikTok Shop access",
+        "▫️ Full Creativity Rewards Program"
+      ]
+    },
+    "order": {
+      "title": "🛍️ STEP 3: PLACE YOUR ORDER",
+      "emoji": "📝",
+      "color": "#3357FF",
+      "content": [
+        "**Complete the form to begin your order:**",
+        "",
+        "**You'll need to provide:**",
+        "▫️ Selected region (US/UK/EU)",
+        "▫️ Follower count range",
+        "▫️ Verification preference",
+        "▫️ Contact method preference",
+        "▫️ Special requirements",
+        "",
+        "**After submission:**",
+        "▫️ You'll receive payment instructions",
+        "▫️ Use `/order-new` to start",
+        "▫️ Tag @Creatok-Support for assistance"
+      ]
+    },
+    "connection": {
+      "title": "🔄 STEP 4: CONNECTION PROCESS",
+      "emoji": "⚡",
+      "color": "#FF33F5",
+      "content": [
+        "**After successful payment, our system will:**",
+        "",
+        "1️⃣ Assign a dedicated account manager to your order",
+        "2️⃣ Contact you via your preferred method within 1-3 hours",
+        "3️⃣ Provide order confirmation and timeline",
+        "4️⃣ Schedule account transfer session",
+        "5️⃣ Send preliminary access instructions",
+        "",
+        "**Track your order:**",
+        "▫️ Use `/order-status [order-ID]` anytime",
+        "▫️ Use priority support for urgent inquiries"
+      ]
+    },
+    "finalization": {
+      "title": "📋 STEP 5: FINALIZATION",
+      "emoji": "✨",
+      "color": "#FFD700",
+      "content": [
+        "**Final steps to complete your purchase:**",
+        "",
+        "1️⃣ Review account specifications with your account manager",
+        "2️⃣ Receive secure login credentials",
+        "3️⃣ For verified accounts: Download and install custom APK",
+        "4️⃣ Complete account access verification",
+        "5️⃣ Confirm TikTok Shop and Creativity Rewards access",
+        "6️⃣ Complete customer satisfaction survey",
+        "",
+        "**Post-Purchase:**",
+        "▫️ 7-day support period begins",
+        "▫️ Extended support packages available"
+      ]
+    }
+  },
+  "currentStep": "verification",
+  "footer": "Creatok Server Guide",
+  "mentionEveryone": false
+}
