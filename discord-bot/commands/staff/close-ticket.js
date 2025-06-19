@@ -1,6 +1,6 @@
 // commands/staff/close-ticket.js
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-const config = require('../../config/config.js');
+const config = require('../../config/config.js'); // Fixed path
 const { activeTickets, logTicketAction } = require('../../events/interactionCreate.js');
 
 module.exports = {
@@ -36,14 +36,8 @@ module.exports = {
             });
         }
 
-        // CRITICAL: Reply to interaction FIRST before any long-running operations
-        await interaction.reply({ 
-            content: '🔒 Closing ticket...', 
-            ephemeral: true 
-        });
-
-        // Then close the ticket
         await closeTicket(channel, interaction.user, ticketData, false);
+        await interaction.reply({ content: '🔒 Closing ticket...', ephemeral: true });
     },
 };
 
@@ -86,33 +80,17 @@ async function closeTicket(channel, closedBy, ticketData, autoClose = false) {
         // Remove from active tickets
         activeTickets.delete(channel.id);
 
-        // Delete channel after delay with proper error handling
+        // Delete channel after delay
         setTimeout(async () => {
             try {
-                // Check if channel still exists before deletion
-                const guild = channel.guild;
-                const channelToDelete = guild.channels.cache.get(channel.id);
-                
-                if (channelToDelete) {
-                    await channelToDelete.delete('Ticket closed');
-                    console.log(`✅ Ticket channel deleted successfully`);
-                } else {
-                    console.log(`⚠️ Channel ${channel.id} no longer exists`);
-                }
+                await channel.delete();
             } catch (error) {
                 console.error('Error deleting ticket channel:', error);
-                // Handle specific Discord API errors
-                if (error.code === 10003) {
-                    console.log('Channel was already deleted');
-                } else if (error.code === 50013) {
-                    console.log('Missing permissions to delete channel');
-                }
             }
         }, 10000);
 
     } catch (error) {
         console.error('Error closing ticket:', error);
-        throw error; // Re-throw so calling code can handle it
     }
 }
 

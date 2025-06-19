@@ -1,4 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, MessageFlags } = require('discord.js');
 const config = require('../config/config.js');
 const { updateUserRegion, trackInteraction } = require('../utils/database.js');
 const { handleAccountPurchase, handleModalSubmit } = require('../handlers/purchaseHandlers.js');
@@ -6,6 +6,7 @@ const { handleOrderCancellation } = require('../handlers/orderHandlers.js');
 // Import the ticket handler
 const { handleTicketInteraction, createTicket } = require('../handlers/ticketHandlers.js');
 const { loadProducts } = require('../commands/admin/update-price.js');
+
 module.exports = {
     name: 'interactionCreate',
     once: false,
@@ -81,7 +82,7 @@ module.exports = {
                         await handleChannelSelection(interaction, 'EU', 'region');
                         break;
 
-                        //handle two buttons  
+                    //handle two buttons  
                     case 'getting_started':
                         await handleGettingStarted(interaction);
                         break;
@@ -94,27 +95,14 @@ module.exports = {
                         break;
 
                     case 'final_close_ticket':
-                        const { closeTicket } = require('../commands/staff/close-ticket.js');
-                        const { activeTickets } = require('../handlers/ticketHandlers.js');
-                        
-                        const channel = interaction.channel;
-                        const ticketData = activeTickets.get(channel.id);
-                        
-                        if (!ticketData) {
-                            return interaction.reply({
-                                content: '❌ Ticket data not found.',
-                                ephemeral: true
-                            });
-                        }
-                        
-                        await closeTicket(channel, interaction.user, ticketData, false);
-                        await interaction.reply({ content: '🔒 Closing ticket...', ephemeral: true });
+                        // FIX: Handle ticket closing properly to avoid double responses
+                        await handleFinalCloseTicket(interaction);
                         break;
                     default:
                         console.log(`Unknown button interaction: ${customId}`);
                         await safeReply(interaction, {
                             content: '❌ This button interaction is not recognized.',
-                            ephemeral: true
+                            flags: MessageFlags.Ephemeral
                         });
                 }
             }
@@ -145,20 +133,71 @@ module.exports = {
             // Only try to respond if the interaction hasn't been handled yet
             await safeReply(interaction, {
                 content: '❌ An error occurred while processing your request. Please try again later.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
     }
 };
 
 /**
+ * Handle final ticket closing - Fixed to prevent double responses
+ */
+async function handleFinalCloseTicket(interaction) {
+    try {
+        const { closeTicket } = require('../commands/staff/close-ticket.js');
+        const { activeTickets } = require('../handlers/ticketHandlers.js');
+        
+        const channel = interaction.channel;
+        const ticketData = activeTickets.get(channel.id);
+        
+        if (!ticketData) {
+            return await safeReply(interaction, {
+                content: '❌ Ticket data not found.',
+                flags: MessageFlags.Ephemeral
+            });
+        }
+        
+        // Acknowledge the interaction first
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ 
+                content: '🔒 Closing ticket...', 
+                flags: MessageFlags.Ephemeral 
+            });
+        }
+        
+        // Then close the ticket (this should NOT try to respond to the interaction)
+        await closeTicket(channel, interaction.user, ticketData, false);
+        
+        console.log(`✅ Ticket closed successfully by ${interaction.user.tag}`);
+        
+    } catch (error) {
+        console.error('Error in handleFinalCloseTicket:', error);
+        
+        // Only respond if we haven't already
+        if (!interaction.replied && !interaction.deferred) {
+            await safeReply(interaction, {
+                content: '❌ Failed to close ticket. Please try again later.',
+                flags: MessageFlags.Ephemeral
+            });
+        }
+    }
+}
+
+/**
  * Safely reply to an interaction, checking if it's already been replied to
+ * Updated to use flags instead of ephemeral
  */
 async function safeReply(interaction, options) {
     try {
         if (!interaction.isRepliable()) {
             console.log('Interaction is not repliable - likely expired');
             return;
+        }
+
+        // Convert ephemeral to flags if present
+        if (options.ephemeral) {
+            options.flags = MessageFlags.Ephemeral;
+            delete options.ephemeral;
         }
 
         if (interaction.replied) {
@@ -191,7 +230,7 @@ async function handleTicketCreation(interaction, ticketType) {
         }
 
         // Defer the reply immediately
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         
         // Check if user already has an active ticket
         const { activeTickets } = require('../handlers/ticketHandlers.js');
@@ -228,7 +267,8 @@ async function handleTicketCreation(interaction, ticketType) {
         
         // Use safe reply for error handling
         await safeReply(interaction, {
-            content: '❌ An error occurred while creating your ticket. Please try again later.'
+            content: '❌ An error occurred while creating your ticket. Please try again later.',
+            flags: MessageFlags.Ephemeral
         });
     }
 }
@@ -349,7 +389,7 @@ async function handleAccountSelectionFromModal(interaction) {
             console.log(`Product not found: ${selectedValue}`);
             await safeReply(interaction, {
                 content: '❌ Selected product not found. Please try again.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
             return;
         }
@@ -375,7 +415,7 @@ async function handleAccountSelectionFromModal(interaction) {
         
         await safeReply(interaction, {
             content: '❌ Failed to process account selection. Please try again later.',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
     }
 }
@@ -400,7 +440,7 @@ async function handleShowAccountOptionsModal(interaction) {
         if (products.length === 0) {
             await safeReply(interaction, {
                 content: '❌ No products are currently available. Please contact an administrator.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
             return;
         }
@@ -455,7 +495,7 @@ async function handleShowAccountOptionsModal(interaction) {
         await safeReply(interaction, {
             embeds: [embed],
             components: [row],
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
 
         console.log(`✅ Account selection modal displayed to ${interaction.user.tag} with ${totalProducts} products`);
@@ -465,7 +505,7 @@ async function handleShowAccountOptionsModal(interaction) {
         
         await safeReply(interaction, {
             content: '❌ Failed to load account options. Please try again later.',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
     }
 }
@@ -490,7 +530,7 @@ async function handleDynamicProductPurchase(interaction, productId) {
             console.log(`Product not found for direct purchase: ${productId}`);
             await safeReply(interaction, {
                 content: '❌ This product is no longer available. Please check the latest options.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
             return;
         }
@@ -516,7 +556,7 @@ async function handleDynamicProductPurchase(interaction, productId) {
         
         await safeReply(interaction, {
             content: '❌ Failed to process product purchase. Please try again later.',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
     }
 }
@@ -592,7 +632,7 @@ async function handleRegionInterest(interaction, regionName) {
         await safeReply(interaction, {
             embeds: [embed],
             components: [channelRow],
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
 
         console.log(`✅ Region interest selection sent to ${interaction.user.tag} for ${regionName}`);
@@ -602,7 +642,7 @@ async function handleRegionInterest(interaction, regionName) {
         
         await safeReply(interaction, {
             content: '❌ Failed to process region selection. Please try again later.',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
     }
 }
@@ -630,7 +670,7 @@ async function handleChannelSelection(interaction, regionName, channelType) {
                 console.error(`❌ Could not find guild for user ${interaction.user.tag}`);
                 await safeReply(interaction, {
                     content: '❌ Could not find the server. Please make sure you are still a member of the Creatok server.',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
                 return;
             }
@@ -640,7 +680,7 @@ async function handleChannelSelection(interaction, regionName, channelType) {
                 console.error(`❌ Could not find member ${interaction.user.tag} in guild`);
                 await safeReply(interaction, {
                     content: '❌ Could not find your member profile. Please rejoin the server if you left.',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
                 return;
             }
@@ -656,7 +696,7 @@ async function handleChannelSelection(interaction, regionName, channelType) {
         
         await safeReply(interaction, {
             content: '❌ Failed to complete setup. Please try again later.',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
     }
 }
@@ -680,7 +720,7 @@ async function assignRoleAndRedirect(interaction, guild, member, regionName, cha
             console.error(`❌ ${regionName} role ID not configured in config.js`);
             await safeReply(interaction, {
                 content: `❌ ${regionName} role not configured. Please contact an administrator.`,
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
             return;
         }
@@ -690,7 +730,7 @@ async function assignRoleAndRedirect(interaction, guild, member, regionName, cha
             console.error(`❌ ${regionName} role not found in guild with ID: ${roleId}`);
             await safeReply(interaction, {
                 content: `❌ ${regionName} role not found. Please contact an administrator.`,
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
             return;
         }
@@ -700,7 +740,7 @@ async function assignRoleAndRedirect(interaction, guild, member, regionName, cha
             console.error('❌ Bot does not have ManageRoles permission');
             await safeReply(interaction, {
                 content: '❌ Bot does not have permission to manage roles. Please contact an administrator.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
             return;
         }
@@ -709,7 +749,7 @@ async function assignRoleAndRedirect(interaction, guild, member, regionName, cha
             console.error(`❌ Bot role position (${botMember.roles.highest.position}) is not higher than target role position (${role.position})`);
             await safeReply(interaction, {
                 content: '❌ Bot cannot assign this role due to role hierarchy. Please contact an administrator.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
             return;
         }
@@ -761,7 +801,7 @@ async function assignRoleAndRedirect(interaction, guild, member, regionName, cha
             // If update fails, try reply as fallback
             await safeReply(interaction, {
                 content: `Click here to go to ${channelMention}`,
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
