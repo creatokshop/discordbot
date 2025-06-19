@@ -1,6 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const config = require('../config/config.js');
-const { trackInteraction, recordPurchase, validateDiscountCode, applyDiscountCode } = require('../utils/database.js');
+const { trackInteraction, recordPurchase, validateDiscountCode, applyDiscountCode, getOrCreateUser } = require('../utils/database.js');
 const { createOrderChannel } = require('./orderHandlers');
 
 /**
@@ -120,6 +120,15 @@ async function handleModalSubmit(interaction) {
 
             // Process all async operations
             try {
+                // FIXED: Ensure user exists in database before recording purchase
+                console.log(`👤 Ensuring user exists in database: ${interaction.user.tag}`);
+                await getOrCreateUser({
+                    id: interaction.user.id,
+                    tag: interaction.user.tag,
+                    joinedAt: new Date()
+                });
+                console.log(`✅ User ensured in database: ${interaction.user.tag}`);
+
                 // Track the order submission
                 await trackInteraction(interaction.user.id, 'order_submitted');
 
