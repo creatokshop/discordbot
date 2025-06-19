@@ -1,4 +1,4 @@
-// handlers/ticketHandlers.js - Complete ticket system handler
+// handlers/ticketHandlers.js - Complete ticket system handler (FIXED)
 const { EmbedBuilder, ChannelType, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const config = require('../config/config.js');
 
@@ -40,6 +40,12 @@ async function handleTicketInteraction(interaction) {
     // Handle ticket closing
     if (customId === 'close_ticket') {
         await handleCloseTicket(interaction);
+        return true;
+    }
+
+    // Handle final ticket closing (from your second file)
+    if (customId === 'final_close_ticket') {
+        await handleFinalCloseTicket(interaction);
         return true;
     }
 
@@ -243,13 +249,12 @@ async function createTicket(interaction, ticketType = 'general', ticketTypeName 
 }
 
 /**
- * Handle ticket resolution
+ * Handle ticket resolution - SINGLE VERSION ONLY
  */
 async function handleResolveTicket(interaction) {
     try {
         const channelId = interaction.channel.id;
         console.log(`Resolving ticket in channel: ${channelId}`);
-        console.log(`Active tickets:`, Array.from(activeTickets.keys()));
         
         const ticketData = activeTickets.get(channelId);
 
@@ -294,7 +299,11 @@ async function handleResolveTicket(interaction) {
             .setTimestamp();
 
         // Update channel name to show resolved status
-        await interaction.channel.setName(`resolved-${ticketData.ticketId}`);
+        try {
+            await interaction.channel.setName(`resolved-${ticketData.ticketId}`);
+        } catch (error) {
+            console.log(`⚠️ Could not rename channel: ${error.message}`);
+        }
 
         await interaction.reply({
             embeds: [resolvedEmbed]
@@ -303,17 +312,17 @@ async function handleResolveTicket(interaction) {
         // Log resolution
         await logTicketAction('resolved', ticketData, interaction.user, interaction.guild);
 
-        // Auto-close after 5 minutes
-        setTimeout(async () => {
+        // Store timeout ID for potential cancellation
+        const timeoutId = setTimeout(async () => {
             try {
-                const currentTicketData = activeTickets.get(channelId);
-                if (currentTicketData && currentTicketData.status === 'resolved') {
-                    await autoCloseTicket(interaction.channel, ticketData, interaction.user, interaction.guild);
-                }
+                await autoCloseTicket(interaction.channel, ticketData, interaction.user, interaction.guild);
             } catch (error) {
-                console.error('Error in auto-close:', error);
+                console.error('Error in auto-close timeout:', error);
             }
         }, 5 * 60 * 1000); // 5 minutes
+
+        // Store timeout ID in ticket data for potential cancellation
+        ticketData.autoCloseTimeout = timeoutId;
 
         console.log(`✅ Ticket #${ticketData.ticketId} resolved by ${interaction.user.tag}`);
 
@@ -330,7 +339,7 @@ async function handleResolveTicket(interaction) {
 }
 
 /**
- * Handle manual ticket closing
+ * Handle manual ticket closing - SINGLE VERSION WITH PROPER INTERACTION HANDLING
  */
 async function handleCloseTicket(interaction) {
     try {
@@ -358,6 +367,20 @@ async function handleCloseTicket(interaction) {
             });
         }
 
+        // IMPORTANT: Reply to interaction FIRST before closing
+        await interaction.reply({
+            content: '🔒 Closing ticket...',
+            ephemeral: true
+        });
+
+        // Cancel auto-close timeout if it exists
+        if (ticketData.autoCloseTimeout) {
+            clearTimeout(ticketData.autoCloseTimeout);
+            delete ticketData.autoCloseTimeout;
+            console.log(`✅ Cancelled auto-close timeout for ticket #${ticketData.ticketId}`);
+        }
+
+        // Now close the ticket without trying to respond to interaction
         await closeTicket(interaction.channel, ticketData, interaction.user, interaction.guild, false);
 
         console.log(`✅ Ticket #${ticketData.ticketId} closed by ${interaction.user.tag}`);
@@ -375,7 +398,57 @@ async function handleCloseTicket(interaction) {
 }
 
 /**
- * Close a ticket (manual or auto)
+ * Handle final ticket closing from your second file - FIXED
+ */
+async function handleFinalCloseTicket(interaction) {
+    try {
+        const channel = interaction.channel;
+        const ticketData = activeTickets.get(channel.id);
+        
+        if (!ticketData) {
+            return interaction.reply({
+                content: '❌ Ticket data not found.',
+                ephemeral: true
+            });
+        }
+        
+        // Check permissions
+        const hasStaffRole = interaction.member.roles.cache.has(config.roles.staff);
+        const isTicketOwner = ticketData.userId === interaction.user.id;
+
+        if (!hasStaffRole && !isTicketOwner) {
+            return interaction.reply({
+                content: '❌ Only staff members or the ticket creator can close tickets.',
+                ephemeral: true
+            });
+        }
+        
+        // IMPORTANT: Acknowledge the interaction FIRST
+        await interaction.reply({ 
+            content: '🔒 Closing ticket...', 
+            ephemeral: true
+        });
+        
+        // Then close the ticket (this should NOT try to respond to the interaction)
+        await closeTicket(channel, ticketData, interaction.user, interaction.guild, false);
+        
+        console.log(`✅ Final ticket close completed by ${interaction.user.tag}`);
+        
+    } catch (error) {
+        console.error('Error in handleFinalCloseTicket:', error);
+        
+        // Only respond if we haven't already
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({
+                content: '❌ Failed to close ticket. Please try again later.',
+                ephemeral: true
+            });
+        }
+    }
+}
+
+/**
+ * Close a ticket (manual or auto) - FIXED TO NOT HANDLE INTERACTIONS
  */
 async function closeTicket(channel, ticketData, user, guild, isAutoClose = false) {
     try {
@@ -496,154 +569,6 @@ async function autoCloseTicket(channel, ticketData, user, guild) {
 }
 
 /**
- * Enhanced ticket resolution with better timeout handling
- */
-async function handleResolveTicket(interaction) {
-    try {
-        const channelId = interaction.channel.id;
-        console.log(`Resolving ticket in channel: ${channelId}`);
-        
-        const ticketData = activeTickets.get(channelId);
-
-        if (!ticketData) {
-            console.log(`No ticket data found for channel ${channelId}`);
-            return interaction.reply({
-                content: '❌ This is not a valid ticket channel.',
-                flags: 64 // EPHEMERAL flag
-            });
-        }
-
-        // Check if user has staff role or is ticket owner
-        const hasStaffRole = interaction.member.roles.cache.has(config.roles.staff);
-        const isTicketOwner = ticketData.userId === interaction.user.id;
-
-        console.log(`User ${interaction.user.tag} - Staff: ${hasStaffRole}, Owner: ${isTicketOwner}`);
-
-        if (!hasStaffRole && !isTicketOwner) {
-            return interaction.reply({
-                content: '❌ Only staff members or the ticket creator can resolve tickets.',
-                flags: 64 // EPHEMERAL flag
-            });
-        }
-
-        // Update ticket status
-        ticketData.status = 'resolved';
-        ticketData.resolvedBy = interaction.user.tag;
-        ticketData.resolvedAt = new Date();
-
-        // Create resolved embed
-        const resolvedEmbed = new EmbedBuilder()
-            .setTitle(`✅ Ticket #${ticketData.ticketId} - RESOLVED`)
-            .setDescription(
-                `This ticket has been marked as resolved by ${interaction.user}.\n\n` +
-                `**Resolution Details:**\n` +
-                `• Resolved by: ${interaction.user.tag}\n` +
-                `• Resolved at: <t:${Math.floor(Date.now() / 1000)}:F>\n\n` +
-                `*This ticket will be automatically closed in 5 minutes if no further action is needed.*`
-            )
-            .setColor(0x57F287)
-            .setFooter({ text: 'Ticket will auto-close in 5 minutes' })
-            .setTimestamp();
-
-        // Update channel name to show resolved status
-        try {
-            await interaction.channel.setName(`resolved-${ticketData.ticketId}`);
-        } catch (error) {
-            console.log(`⚠️ Could not rename channel: ${error.message}`);
-        }
-
-        await interaction.reply({
-            embeds: [resolvedEmbed]
-        });
-
-        // Log resolution
-        await logTicketAction('resolved', ticketData, interaction.user, interaction.guild);
-
-        // Store timeout ID for potential cancellation
-        const timeoutId = setTimeout(async () => {
-            try {
-                await autoCloseTicket(interaction.channel, ticketData, interaction.user, interaction.guild);
-            } catch (error) {
-                console.error('Error in auto-close timeout:', error);
-            }
-        }, 5 * 60 * 1000); // 5 minutes
-
-        // Store timeout ID in ticket data for potential cancellation
-        ticketData.autoCloseTimeout = timeoutId;
-
-        console.log(`✅ Ticket #${ticketData.ticketId} resolved by ${interaction.user.tag}`);
-
-    } catch (error) {
-        console.error('Error in handleResolveTicket:', error);
-        
-        if (!interaction.replied) {
-            await interaction.reply({
-                content: '❌ Error resolving ticket. Please try again.',
-                ephemeral: true
-            });
-        }
-    }
-}
-
-/**
- * Enhanced manual ticket closing with timeout cancellation
- */
-async function handleCloseTicket(interaction) {
-    try {
-        const channelId = interaction.channel.id;
-        console.log(`Closing ticket in channel: ${channelId}`);
-        
-        const ticketData = activeTickets.get(channelId);
-
-        if (!ticketData) {
-            console.log(`No ticket data found for channel ${channelId}`);
-            return interaction.reply({
-                content: '❌ This is not a valid ticket channel.',
-                ephemeral: true
-            });
-        }
-
-        // Check if user has staff role or is ticket owner
-        const hasStaffRole = interaction.member.roles.cache.has(config.roles.staff);
-        const isTicketOwner = ticketData.userId === interaction.user.id;
-
-        if (!hasStaffRole && !isTicketOwner) {
-            return interaction.reply({
-                content: '❌ Only staff members or the ticket creator can close tickets.',
-                ephemeral: true
-            });
-        }
-
-        // Cancel auto-close timeout if it exists
-        if (ticketData.autoCloseTimeout) {
-            clearTimeout(ticketData.autoCloseTimeout);
-            delete ticketData.autoCloseTimeout;
-            console.log(`✅ Cancelled auto-close timeout for ticket #${ticketData.ticketId}`);
-        }
-
-        await closeTicket(interaction.channel, ticketData, interaction.user, interaction.guild, false);
-
-        console.log(`✅ Ticket #${ticketData.ticketId} closed by ${interaction.user.tag}`);
-
-    } catch (error) {
-        console.error('Error in handleCloseTicket:', error);
-        
-        if (!interaction.replied) {
-            await interaction.reply({
-                content: '❌ Error closing ticket. Please try again.',
-                ephemeral: true
-            });
-        }
-    }
-}
-/**
- * Auto-close resolved ticket
- */
-async function autoCloseTicket(channel, ticketData, user, guild) {
-    await closeTicket(channel, ticketData, user, guild, true);
-}
-
-/**
  * Log ticket actions to support channel
  */
 async function logTicketAction(action, ticketData, user, guild, isAutoClose = false) {
@@ -725,6 +650,7 @@ module.exports = {
     handleTicketInteraction,
     activeTickets,
     createTicket,
+    closeTicket, // Export this for your slash command
     logTicketAction,
     getActiveTicketsCount,
     getUserActiveTicket,
