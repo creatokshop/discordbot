@@ -6,7 +6,6 @@ const { handleOrderCancellation } = require('../handlers/orderHandlers.js');
 // Import the ticket handler
 const { handleTicketInteraction, createTicket } = require('../handlers/ticketHandlers.js');
 const { loadProducts } = require('../commands/admin/update-price.js');
-
 module.exports = {
     name: 'interactionCreate',
     once: false,
@@ -82,7 +81,7 @@ module.exports = {
                         await handleChannelSelection(interaction, 'EU', 'region');
                         break;
 
-                    // Handle two buttons  
+                        //handle two buttons  
                     case 'getting_started':
                         await handleGettingStarted(interaction);
                         break;
@@ -102,14 +101,14 @@ module.exports = {
                         const ticketData = activeTickets.get(channel.id);
                         
                         if (!ticketData) {
-                            return safeReply(interaction, {
+                            return interaction.reply({
                                 content: '❌ Ticket data not found.',
                                 ephemeral: true
                             });
                         }
                         
                         await closeTicket(channel, interaction.user, ticketData, false);
-                        await safeReply(interaction, { content: '🔒 Closing ticket...', ephemeral: true });
+                        await interaction.reply({ content: '🔒 Closing ticket...', ephemeral: true });
                         break;
                     default:
                         console.log(`Unknown button interaction: ${customId}`);
@@ -153,128 +152,33 @@ module.exports = {
 };
 
 /**
- * UPDATED: Safely reply to an interaction with comprehensive state checking
+ * Safely reply to an interaction, checking if it's already been replied to
  */
 async function safeReply(interaction, options) {
     try {
-        // First check if interaction is still valid
-        if (!interaction || !interaction.isRepliable()) {
-            console.log('Interaction is not repliable - likely expired or invalid');
-            return false;
-        }
-
-        // Check interaction state and respond appropriately
-        if (!interaction.replied && !interaction.deferred) {
-            console.log('Using initial reply');
-            await interaction.reply(options);
-            return true;
-        } 
-        
-        if (interaction.deferred && !interaction.replied) {
-            console.log('Using editReply for deferred interaction');
-            await interaction.editReply(options);
-            return true;
-        } 
-        
-        if (interaction.replied) {
-            console.log('Using followUp for already replied interaction');
-            // For followUp, ensure ephemeral is set if not specified
-            if (options.ephemeral === undefined) {
-                options.ephemeral = true;
-            }
-            await interaction.followUp(options);
-            return true;
-        }
-
-        console.log('Unexpected interaction state - skipping response');
-        return false;
-
-    } catch (error) {
-        console.error('Error in safeReply:', error.message);
-        
-        // Last resort: try followUp with minimal content
-        try {
-            if (interaction.replied && interaction.isRepliable()) {
-                await interaction.followUp({
-                    content: '❌ An error occurred while processing your request.',
-                    ephemeral: true
-                });
-            }
-        } catch (followUpError) {
-            console.error('Failed to send followUp message:', followUpError.message);
-        }
-        
-        return false;
-    }
-}
-
-/**
- * UPDATED: Handle account selection from modal with better error handling
- */
-async function handleAccountSelectionFromModal(interaction) {
-    console.log(`Account selection from modal: ${interaction.values[0]} by ${interaction.user.tag}`);
-    
-    try {
-        const selectedValue = interaction.values[0];
-        
-        // Check if interaction is still valid
         if (!interaction.isRepliable()) {
-            console.log('Account selection interaction has expired');
+            console.log('Interaction is not repliable - likely expired');
             return;
         }
 
-        // Defer the reply immediately to prevent timeout
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.deferReply({ ephemeral: true });
+        if (interaction.replied) {
+            console.log('Interaction already replied to, using followUp');
+            return await interaction.followUp(options);
+        } else if (interaction.deferred) {
+            console.log('Interaction deferred, using editReply');
+            return await interaction.editReply(options);
+        } else {
+            console.log('Using initial reply');
+            return await interaction.reply(options);
         }
-
-        // Load current products to get the details
-        const products = await loadProducts();
-        const selectedProduct = products.find(p => p.id === selectedValue);
-
-        if (!selectedProduct) {
-            console.log(`Product not found: ${selectedValue}`);
-            await safeReply(interaction, {
-                content: '❌ Selected product not found. Please try again.',
-                ephemeral: true
-            });
-            return;
-        }
-
-        // Track the selection
-        try {
-            await trackInteraction(interaction.user.id, 'product_selected', {
-                productId: selectedProduct.id,
-                productLabel: selectedProduct.label,
-                price: selectedProduct.price
-            });
-        } catch (trackError) {
-            console.error('Failed to track interaction:', trackError);
-            // Don't fail the whole process for tracking error
-        }
-
-        // Call handleAccountPurchase with the interaction object
-        // This will handle the rest of the flow including showing modals
-        await handleAccountPurchase(
-            interaction, 
-            selectedProduct.region, 
-            selectedProduct.type, 
-            selectedProduct.price,
-            selectedProduct.label
-        );
-
     } catch (error) {
-        console.error('Error in handleAccountSelectionFromModal:', error);
-        
-        await safeReply(interaction, {
-            content: '❌ Failed to process account selection. Please try again later.',
-            ephemeral: true
-        });
+        console.error('Error in safeReply:', error);
+        // If we can't reply, at least log it - don't throw
     }
 }
 
 /**
- * UPDATED: Handle ticket creation with proper deferral
+ * Handle ticket creation from setup panel buttons
  */
 async function handleTicketCreation(interaction, ticketType) {
     try {
@@ -286,7 +190,7 @@ async function handleTicketCreation(interaction, ticketType) {
             return;
         }
 
-        // Defer the reply immediately to prevent timeout
+        // Defer the reply immediately
         await interaction.deferReply({ ephemeral: true });
         
         // Check if user already has an active ticket
@@ -322,436 +226,9 @@ async function handleTicketCreation(interaction, ticketType) {
     } catch (error) {
         console.error('Error creating ticket:', error);
         
+        // Use safe reply for error handling
         await safeReply(interaction, {
-            content: '❌ An error occurred while creating your ticket. Please try again later.',
-            ephemeral: true
-        });
-    }
-}
-
-/**
- * UPDATED: Handle channel selection with proper interaction state management
- */
-async function handleChannelSelection(interaction, regionName, channelType) {
-    try {
-        console.log(`Handling channel selection: ${regionName} ${channelType} for user: ${interaction.user.tag}`);
-        
-        if (!interaction.isRepliable()) {
-            console.log('Channel selection interaction has expired');
-            return;
-        }
-
-        // For button interactions that update the original message, use interaction.update()
-        if (interaction.isButton()) {
-            // This acknowledges the interaction and updates the original message
-            await interaction.update({
-                content: '⏳ Processing your selection...',
-                embeds: [],
-                components: []
-            });
-            
-            // Now perform the role assignment
-            if (!interaction.guild) {
-                console.log(`Channel selection in DM for ${interaction.user.tag} - need to find guild`);
-                
-                const targetGuild = interaction.client.guilds.cache.find(guild => 
-                    guild.members.cache.has(interaction.user.id)
-                );
-                
-                if (!targetGuild) {
-                    console.error(`❌ Could not find guild for user ${interaction.user.tag}`);
-                    return interaction.followUp({
-                        content: '❌ Could not find the server. Please make sure you are still a member of the Creatok server.',
-                        ephemeral: true
-                    });
-                }
-
-                const member = targetGuild.members.cache.get(interaction.user.id);
-                if (!member) {
-                    console.error(`❌ Could not find member ${interaction.user.tag} in guild`);
-                    return interaction.followUp({
-                        content: '❌ Could not find your member profile. Please rejoin the server if you left.',
-                        ephemeral: true
-                    });
-                }
-
-                await assignRoleAndRedirect(interaction, targetGuild, member, regionName, channelType);
-                return;
-            }
-
-            await assignRoleAndRedirect(interaction, interaction.guild, interaction.member, regionName, channelType);
-        } else {
-            // For other interaction types, defer first
-            if (!interaction.replied && !interaction.deferred) {
-                await interaction.deferReply({ ephemeral: true });
-            }
-            
-            await assignRoleAndRedirect(interaction, interaction.guild, interaction.member, regionName, channelType);
-        }
-
-    } catch (error) {
-        console.error(`Error in handleChannelSelection for ${regionName} ${channelType}:`, error);
-        
-        await safeReply(interaction, {
-            content: '❌ Failed to complete setup. Please try again later.',
-            ephemeral: true
-        });
-    }
-}
-
-/**
- * UPDATED: Helper function to assign role and redirect to channel
- */
-async function assignRoleAndRedirect(interaction, guild, member, regionName, channelType) {
-    try {
-        const roleMapping = {
-            'US': config.roles.usRegion,
-            'UK': config.roles.ukRegion,
-            'EU': config.roles.euRegion
-        };
-        
-        const roleId = roleMapping[regionName];
-        
-        console.log(`Looking for role: ${regionName} with ID: ${roleId}`);
-        
-        if (!roleId) {
-            console.error(`❌ ${regionName} role ID not configured in config.js`);
-            return interaction.followUp({
-                content: `❌ ${regionName} role not configured. Please contact an administrator.`,
-                ephemeral: true
-            });
-        }
-
-        const role = guild.roles.cache.get(roleId);
-        if (!role) {
-            console.error(`❌ ${regionName} role not found in guild with ID: ${roleId}`);
-            return interaction.followUp({
-                content: `❌ ${regionName} role not found. Please contact an administrator.`,
-                ephemeral: true
-            });
-        }
-
-        const botMember = guild.members.me;
-        if (!botMember.permissions.has(['ManageRoles'])) {
-            console.error('❌ Bot does not have ManageRoles permission');
-            return interaction.followUp({
-                content: '❌ Bot does not have permission to manage roles. Please contact an administrator.',
-                ephemeral: true
-            });
-        }
-
-        if (botMember.roles.highest.position <= role.position) {
-            console.error(`❌ Bot role position (${botMember.roles.highest.position}) is not higher than target role position (${role.position})`);
-            return interaction.followUp({
-                content: '❌ Bot cannot assign this role due to role hierarchy. Please contact an administrator.',
-                ephemeral: true
-            });
-        }
-
-        // Remove existing region roles
-        const regionRoles = [config.roles.usRegion, config.roles.ukRegion, config.roles.euRegion].filter(Boolean);
-        const memberRegionRoles = member.roles.cache.filter(role => regionRoles.includes(role.id));
-        
-        if (memberRegionRoles.size > 0) {
-            console.log(`Removing existing region roles: ${memberRegionRoles.map(r => r.name).join(', ')}`);
-            await member.roles.remove(memberRegionRoles);
-        }
-
-        // Add new role
-        await member.roles.add(role);
-        console.log(`✅ Successfully assigned ${regionName} role to ${interaction.user.tag}`);
-
-        // Update database
-        try {
-            await updateUserRegion(interaction.user.id, regionName.toLowerCase(), channelType);
-            console.log(`✅ Updated database region for ${interaction.user.tag} to ${regionName.toLowerCase()} with ${channelType} preference`);
-        } catch (dbError) {
-            console.error(`❌ Failed to update database for ${interaction.user.tag}:`, dbError);
-        }
-
-        try {
-            await trackInteraction(interaction.user.id, 'channel_selection');
-        } catch (trackError) {
-            console.error('Failed to track interaction:', trackError);
-        }
-
-        // Determine target channel
-        let targetChannelId;
-        if (channelType === 'general') {
-            targetChannelId = config.channels.general;
-        } else {
-            const channelMapping = {
-                'US': config.channels.usInterest,
-                'UK': config.channels.ukInterest,
-                'EU': config.channels.euInterest
-            };
-            targetChannelId = channelMapping[regionName];
-        }
-
-        const targetChannel = guild.channels.cache.get(targetChannelId);
-        const channelMention = targetChannel ? `<#${targetChannelId}>` : 'the selected channel';
-
-        // Send success message
-        await interaction.followUp({
-            content: `✅ Successfully assigned ${regionName} role! You can now access ${channelMention}`,
-            ephemeral: true
-        });
-
-        console.log(`✅ Channel selection completed and redirected ${interaction.user.tag} to: ${regionName} ${channelType}`);
-
-    } catch (error) {
-        console.error(`Error in assignRoleAndRedirect for ${regionName} ${channelType}:`, error);
-        
-        await interaction.followUp({
-            content: '❌ Failed to assign role. Please contact an administrator.',
-            ephemeral: true
-        });
-    }
-}
-
-/**
- * UPDATED: Handle showing account options modal with proper state management
- */
-async function handleShowAccountOptionsModal(interaction) {
-    try {
-        console.log(`Account options modal requested by: ${interaction.user.tag}`);
-        
-        if (!interaction.isRepliable()) {
-            console.log('Account options interaction has expired');
-            return;
-        }
-
-        // Defer reply to prevent timeout while loading products
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.deferReply({ ephemeral: true });
-        }
-
-        try {
-            await trackInteraction(interaction.user.id, 'view_account_options');
-        } catch (trackError) {
-            console.error('Failed to track interaction:', trackError);
-        }
-        
-        // Load current products
-        const products = await loadProducts();
-        
-        if (products.length === 0) {
-            return safeReply(interaction, {
-                content: '❌ No products are currently available. Please contact an administrator.',
-                ephemeral: true
-            });
-        }
-
-        // Create options from loaded products
-        const accountOptions = products.map(product => ({
-            label: product.label,
-            description: `${product.description} - $${product.price}`,
-            value: product.id,
-            emoji: product.featured ? '⭐' : undefined
-        }));
-
-        // Limit to 25 options (Discord's limit)
-        const limitedOptions = accountOptions.slice(0, 25);
-
-        const selectMenu = new StringSelectMenuBuilder()
-            .setCustomId('account_selection')
-            .setPlaceholder('Choose an option')
-            .addOptions(limitedOptions);
-
-        const row = new ActionRowBuilder().addComponents(selectMenu);
-
-        // Calculate some stats for the embed
-        const totalProducts = products.length;
-        const featuredCount = products.filter(p => p.featured).length;
-        const minPrice = Math.min(...products.map(p => p.price));
-        const maxPrice = Math.max(...products.map(p => p.price));
-
-        // Group products by region for additional info
-        const regionCounts = {};
-        products.forEach(product => {
-            regionCounts[product.region] = (regionCounts[product.region] || 0) + 1;
-        });
-
-        const regionInfo = Object.entries(regionCounts)
-            .map(([region, count]) => `${getRegionEmoji(region)} ${region}: ${count}`)
-            .join(' • ');
-
-        const embed = new EmbedBuilder()
-            .setColor('#9146FF')
-            .setTitle('🛒 Choose Your Account Type')
-            .setDescription(
-                `Select the account type you'd like to purchase from the dropdown below:\n\n` +
-                `📦 **${totalProducts}** products available\n` +
-                `⭐ **${featuredCount}** featured products\n` +
-                `💰 Price range: **$${minPrice} - $${maxPrice}**\n\n` +
-                `**Available by Region:**\n${regionInfo}`
-            )
-            .setFooter({ text: 'Select your preferred account type to continue' })
-            .setTimestamp();
-
-        await safeReply(interaction, {
-            embeds: [embed],
-            components: [row],
-            ephemeral: true
-        });
-
-        console.log(`✅ Account selection modal displayed to ${interaction.user.tag} with ${totalProducts} products`);
-
-    } catch (error) {
-        console.error('Error in handleShowAccountOptionsModal:', error);
-        
-        await safeReply(interaction, {
-            content: '❌ Failed to load account options. Please try again later.',
-            ephemeral: true
-        });
-    }
-}
-
-/**
- * UPDATED: Dynamic button handler for direct product purchases
- */
-async function handleDynamicProductPurchase(interaction, productId) {
-    try {
-        console.log(`Direct product purchase: ${productId} by ${interaction.user.tag}`);
-        
-        if (!interaction.isRepliable()) {
-            console.log('Product purchase interaction has expired');
-            return;
-        }
-
-        // Defer reply for processing time
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.deferReply({ ephemeral: true });
-        }
-
-        // Load current products to get the details
-        const products = await loadProducts();
-        const selectedProduct = products.find(p => p.id === productId);
-
-        if (!selectedProduct) {
-            console.log(`Product not found for direct purchase: ${productId}`);
-            return safeReply(interaction, {
-                content: '❌ This product is no longer available. Please check the latest options.',
-                ephemeral: true
-            });
-        }
-
-        // Track the direct purchase attempt
-        try {
-            await trackInteraction(interaction.user.id, 'direct_product_purchase', {
-                productId: selectedProduct.id,
-                productLabel: selectedProduct.label,
-                price: selectedProduct.price
-            });
-        } catch (trackError) {
-            console.error('Failed to track interaction:', trackError);
-        }
-
-        // Use the product data for the purchase
-        await handleAccountPurchase(
-            interaction, 
-            selectedProduct.region, 
-            selectedProduct.type, 
-            selectedProduct.price,
-            selectedProduct.label
-        );
-
-    } catch (error) {
-        console.error('Error in handleDynamicProductPurchase:', error);
-        
-        await safeReply(interaction, {
-            content: '❌ Failed to process product purchase. Please try again later.',
-            ephemeral: true
-        });
-    }
-}
-
-/**
- * Helper function to get region emoji
- */
-function getRegionEmoji(region) {
-    const regionEmojis = {
-        'US': '🇺🇸',
-        'UK': '🇬🇧', 
-        'EU': '🇪🇺',
-        'Non-TTS': '🔗'
-    };
-    return regionEmojis[region] || '🌍';
-}
-
-/**
- * UPDATED: Handle region interest with proper state management
- */
-async function handleRegionInterest(interaction, regionName) {
-    try {
-        console.log(`Handling region interest: ${regionName} for user: ${interaction.user.tag}`);
-        
-        if (!interaction.isRepliable()) {
-            console.log('Region interest interaction has expired');
-            return;
-        }
-
-        try {
-            await trackInteraction(interaction.user.id, 'region_interest');
-        } catch (trackError) {
-            console.error('Failed to track interaction:', trackError);
-        }
-        
-        try {
-            await updateUserRegion(interaction.user.id, regionName.toLowerCase(), 'general');
-            console.log(`✅ Updated database region for ${interaction.user.tag} to ${regionName.toLowerCase()}`);
-        } catch (dbError) {
-            console.error(`❌ Failed to update database for ${interaction.user.tag}:`, dbError);
-        }
-        
-        const regionEmoji = {
-            'US': '🇺🇸',
-            'UK': '🇬🇧',
-            'EU': '🇪🇺'
-        };
-
-        const embed = new EmbedBuilder()
-            .setColor('#5865F2')
-            .setTitle(`${regionEmoji[regionName]} ${regionName} Region Selected`)
-            .setDescription(
-                `**Great choice!** You've selected interest in **${regionName}** accounts.\n\n` +
-                `**Now choose where you'd like to start:**\n\n` +
-                `🌍 **General Channel** - Join the main community discussion\n` +
-                `${regionEmoji[regionName]} **${regionName} Channel** - Access region-specific content and offers\n\n` +
-                `*You can always switch channels later!*`
-            )
-            .setFooter({ 
-                text: `Step 2 of 2 - Choose your preferred channel`,
-                iconURL: interaction.client.user.displayAvatarURL() 
-            })
-            .setTimestamp();
-
-        const channelRow = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`channel_${regionName.toLowerCase()}_general`)
-                    .setLabel('🌍 General Channel')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId(`channel_${regionName.toLowerCase()}_region`)
-                    .setLabel(`${regionEmoji[regionName]} ${regionName} Channel`)
-                    .setStyle(ButtonStyle.Success)
-            );
-
-        await safeReply(interaction, {
-            embeds: [embed],
-            components: [channelRow],
-            ephemeral: true
-        });
-
-        console.log(`✅ Region interest selection sent to ${interaction.user.tag} for ${regionName}`);
-
-    } catch (error) {
-        console.error(`Error in handleRegionInterest for ${regionName}:`, error);
-        
-        await safeReply(interaction, {
-            content: '❌ Failed to process region selection. Please try again later.',
-            ephemeral: true
+            content: '❌ An error occurred while creating your ticket. Please try again later.'
         });
     }
 }
