@@ -94,22 +94,41 @@ module.exports = {
                         break;
 
                     case 'final_close_ticket':
-                        const { closeTicket } = require('../commands/staff/close-ticket.js');
-                        const { activeTickets } = require('../handlers/ticketHandlers.js');
-                        
-                        const channel = interaction.channel;
-                        const ticketData = activeTickets.get(channel.id);
-                        
-                        if (!ticketData) {
-                            return interaction.reply({
-                                content: '❌ Ticket data not found.',
-                                ephemeral: true
-                            });
-                        }
-                        
-                        await closeTicket(channel, interaction.user, ticketData, false);
-                        await interaction.reply({ content: '🔒 Closing ticket...', ephemeral: true });
-                        break;
+                    try {
+                    const { closeTicket } = require('../commands/staff/close-ticket.js');
+                    const { activeTickets } = require('../handlers/ticketHandlers.js');
+        
+                    const channel = interaction.channel;
+                    const ticketData = activeTickets.get(channel.id);
+        
+                  if (!ticketData) {
+                return interaction.reply({
+                content: '❌ Ticket data not found.',
+                ephemeral: true
+                 });
+              }
+
+                // IMPORTANT: Reply to the interaction FIRST
+                await interaction.reply({ 
+                 content: '🔒 Closing ticket...', 
+                 ephemeral: true 
+               });
+
+                // THEN close the ticket (this will delete the channel after 10 seconds)
+             await closeTicket(channel, interaction.user, ticketData, false);
+        
+                   } catch (error) {
+                    console.error('Error closing ticket:', error);
+        
+                    // Only reply if we haven't already replied
+                    if (!interaction.replied && !interaction.deferred) {
+                            await safeReply(interaction, {
+                            content: '❌ Failed to close ticket. Please try again.',
+                            ephemeral: true
+                             });
+                      }
+                   }
+                    break;
                     default:
                         console.log(`Unknown button interaction: ${customId}`);
                         await safeReply(interaction, {
