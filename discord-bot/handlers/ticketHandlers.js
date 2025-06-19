@@ -407,14 +407,57 @@ async function closeTicket(channel, ticketData, user, guild, isAutoClose = false
         // Log closure
         await logTicketAction('closed', ticketData, user, guild, isAutoClose);
 
-        // Delete channel after 10 seconds
+        // Store channel ID for deletion check
+        const channelId = channel.id;
+
+        // Delete channel after 10 seconds with proper error handling
         setTimeout(async () => {
             try {
-                activeTickets.delete(channel.id);
-                await channel.delete('Ticket closed');
-                console.log(`✅ Ticket channel #${ticketData.ticketId} deleted`);
+                // Check if channel still exists before attempting deletion
+                const channelToDelete = guild.channels.cache.get(channelId);
+                
+                if (!channelToDelete) {
+                    console.log(`⚠️ Channel ${channelId} no longer exists, skipping deletion`);
+                    activeTickets.delete(channelId);
+                    return;
+                }
+
+                // Verify the channel is still the same type and accessible
+                if (channelToDelete.type !== ChannelType.GuildText) {
+                    console.log(`⚠️ Channel ${channelId} is not a text channel, skipping deletion`);
+                    activeTickets.delete(channelId);
+                    return;
+                }
+
+                // Check if bot has permission to delete the channel
+                const botMember = guild.members.cache.get(guild.client.user.id);
+                if (!channelToDelete.permissionsFor(botMember)?.has(PermissionsBitField.Flags.ManageChannels)) {
+                    console.log(`⚠️ No permission to delete channel ${channelId}`);
+                    activeTickets.delete(channelId);
+                    return;
+                }
+
+                // Attempt deletion
+                await channelToDelete.delete('Ticket closed');
+                console.log(`✅ Ticket channel #${ticketData.ticketId} deleted successfully`);
+                
+                // Clean up from active tickets after successful deletion
+                activeTickets.delete(channelId);
+                
             } catch (error) {
-                console.error('Error deleting ticket channel:', error);
+                console.error(`Error deleting ticket channel ${channelId}:`, error);
+                
+                // Handle specific Discord API errors
+                if (error.code === 10003) { // Unknown Channel
+                    console.log(`⚠️ Channel ${channelId} was already deleted, cleaning up data`);
+                } else if (error.code === 50013) { // Missing Permissions
+                    console.log(`⚠️ Missing permissions to delete channel ${channelId}`);
+                } else if (error.code === 50001) { // Missing Access
+                    console.log(`⚠️ Missing access to channel ${channelId}`);
+                }
+                
+                // Clean up from active tickets regardless of deletion success
+                activeTickets.delete(channelId);
             }
         }, 10000);
 
@@ -424,6 +467,175 @@ async function closeTicket(channel, ticketData, user, guild, isAutoClose = false
     }
 }
 
+/**
+ * Auto-close resolved ticket with additional safety checks
+ */
+async function autoCloseTicket(channel, ticketData, user, guild) {
+    try {
+        // Double-check that the channel still exists before auto-closing
+        const currentChannel = guild.channels.cache.get(channel.id);
+        if (!currentChannel) {
+            console.log(`⚠️ Channel ${channel.id} no longer exists, skipping auto-close`);
+            activeTickets.delete(channel.id);
+            return;
+        }
+
+        // Verify ticket is still in resolved state
+        const currentTicketData = activeTickets.get(channel.id);
+        if (!currentTicketData || currentTicketData.status !== 'resolved') {
+            console.log(`⚠️ Ticket ${ticketData.ticketId} is no longer in resolved state, skipping auto-close`);
+            return;
+        }
+
+        await closeTicket(currentChannel, ticketData, user, guild, true);
+    } catch (error) {
+        console.error('Error in autoCloseTicket:', error);
+        // Clean up ticket data even if auto-close fails
+        activeTickets.delete(channel.id);
+    }
+}
+
+/**
+ * Enhanced ticket resolution with better timeout handling
+ */
+async function handleResolveTicket(interaction) {
+    try {
+        const channelId = interaction.channel.id;
+        console.log(`Resolving ticket in channel: ${channelId}`);
+        
+        const ticketData = activeTickets.get(channelId);
+
+        if (!ticketData) {
+            console.log(`No ticket data found for channel ${channelId}`);
+            return interaction.reply({
+                content: '❌ This is not a valid ticket channel.',
+                flags: 64 // EPHEMERAL flag
+            });
+        }
+
+        // Check if user has staff role or is ticket owner
+        const hasStaffRole = interaction.member.roles.cache.has(config.roles.staff);
+        const isTicketOwner = ticketData.userId === interaction.user.id;
+
+        console.log(`User ${interaction.user.tag} - Staff: ${hasStaffRole}, Owner: ${isTicketOwner}`);
+
+        if (!hasStaffRole && !isTicketOwner) {
+            return interaction.reply({
+                content: '❌ Only staff members or the ticket creator can resolve tickets.',
+                flags: 64 // EPHEMERAL flag
+            });
+        }
+
+        // Update ticket status
+        ticketData.status = 'resolved';
+        ticketData.resolvedBy = interaction.user.tag;
+        ticketData.resolvedAt = new Date();
+
+        // Create resolved embed
+        const resolvedEmbed = new EmbedBuilder()
+            .setTitle(`✅ Ticket #${ticketData.ticketId} - RESOLVED`)
+            .setDescription(
+                `This ticket has been marked as resolved by ${interaction.user}.\n\n` +
+                `**Resolution Details:**\n` +
+                `• Resolved by: ${interaction.user.tag}\n` +
+                `• Resolved at: <t:${Math.floor(Date.now() / 1000)}:F>\n\n` +
+                `*This ticket will be automatically closed in 5 minutes if no further action is needed.*`
+            )
+            .setColor(0x57F287)
+            .setFooter({ text: 'Ticket will auto-close in 5 minutes' })
+            .setTimestamp();
+
+        // Update channel name to show resolved status
+        try {
+            await interaction.channel.setName(`resolved-${ticketData.ticketId}`);
+        } catch (error) {
+            console.log(`⚠️ Could not rename channel: ${error.message}`);
+        }
+
+        await interaction.reply({
+            embeds: [resolvedEmbed]
+        });
+
+        // Log resolution
+        await logTicketAction('resolved', ticketData, interaction.user, interaction.guild);
+
+        // Store timeout ID for potential cancellation
+        const timeoutId = setTimeout(async () => {
+            try {
+                await autoCloseTicket(interaction.channel, ticketData, interaction.user, interaction.guild);
+            } catch (error) {
+                console.error('Error in auto-close timeout:', error);
+            }
+        }, 5 * 60 * 1000); // 5 minutes
+
+        // Store timeout ID in ticket data for potential cancellation
+        ticketData.autoCloseTimeout = timeoutId;
+
+        console.log(`✅ Ticket #${ticketData.ticketId} resolved by ${interaction.user.tag}`);
+
+    } catch (error) {
+        console.error('Error in handleResolveTicket:', error);
+        
+        if (!interaction.replied) {
+            await interaction.reply({
+                content: '❌ Error resolving ticket. Please try again.',
+                ephemeral: true
+            });
+        }
+    }
+}
+
+/**
+ * Enhanced manual ticket closing with timeout cancellation
+ */
+async function handleCloseTicket(interaction) {
+    try {
+        const channelId = interaction.channel.id;
+        console.log(`Closing ticket in channel: ${channelId}`);
+        
+        const ticketData = activeTickets.get(channelId);
+
+        if (!ticketData) {
+            console.log(`No ticket data found for channel ${channelId}`);
+            return interaction.reply({
+                content: '❌ This is not a valid ticket channel.',
+                ephemeral: true
+            });
+        }
+
+        // Check if user has staff role or is ticket owner
+        const hasStaffRole = interaction.member.roles.cache.has(config.roles.staff);
+        const isTicketOwner = ticketData.userId === interaction.user.id;
+
+        if (!hasStaffRole && !isTicketOwner) {
+            return interaction.reply({
+                content: '❌ Only staff members or the ticket creator can close tickets.',
+                ephemeral: true
+            });
+        }
+
+        // Cancel auto-close timeout if it exists
+        if (ticketData.autoCloseTimeout) {
+            clearTimeout(ticketData.autoCloseTimeout);
+            delete ticketData.autoCloseTimeout;
+            console.log(`✅ Cancelled auto-close timeout for ticket #${ticketData.ticketId}`);
+        }
+
+        await closeTicket(interaction.channel, ticketData, interaction.user, interaction.guild, false);
+
+        console.log(`✅ Ticket #${ticketData.ticketId} closed by ${interaction.user.tag}`);
+
+    } catch (error) {
+        console.error('Error in handleCloseTicket:', error);
+        
+        if (!interaction.replied) {
+            await interaction.reply({
+                content: '❌ Error closing ticket. Please try again.',
+                ephemeral: true
+            });
+        }
+    }
+}
 /**
  * Auto-close resolved ticket
  */

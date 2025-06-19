@@ -93,76 +93,23 @@ module.exports = {
                         await handleShowAccountOptionsModal(interaction);
                         break;
 
-case 'final_close_ticket':
-    // Defer immediately
-    await interaction.deferReply({ ephemeral: true });
-    
-    try {
-        const { activeTickets } = require('../handlers/ticketHandlers.js');
-        
-        const channel = interaction.channel;
-        const ticketData = activeTickets.get(channel.id);
-        
-        if (!ticketData) {
-            return interaction.editReply({
-                content: '❌ Ticket data not found.'
-            });
-        }
-
-        // Check if user has staff role
-        if (!interaction.member.roles.cache.has(config.roles.staff)) {
-            return interaction.editReply({
-                content: '❌ Only staff members can close tickets.'
-            });
-        }
-
-        // Update the deferred reply first
-        await interaction.editReply({ 
-            content: '🔒 Ticket is being closed...' 
-        });
-
-        // Create closure embed
-        const { EmbedBuilder } = require('discord.js');
-        const closureEmbed = new EmbedBuilder()
-            .setTitle('🔒 Ticket Closed')
-            .setDescription(`This ticket has been closed by ${interaction.user.tag}.`)
-            .setColor(0xED4245)
-            .addFields(
-                { name: '📋 Summary', value: `**Ticket #${ticketData.ticketNumber || ticketData.ticketId}** is now closed and will be deleted shortly.`, inline: false }
-            )
-            .setFooter({ text: 'This channel will be deleted in 10 seconds.' });
-
-        // Send closure message to channel
-        await channel.send({ embeds: [closureEmbed] });
-
-        // Log the ticket closure (if you have logging)
-        console.log(`Ticket ${ticketData.ticketNumber || ticketData.ticketId} closed by ${interaction.user.tag}`);
-
-        // Remove from active tickets
-        activeTickets.delete(channel.id);
-
-        // Delete channel after delay
-        setTimeout(async () => {
-            try {
-                await channel.delete();
-                console.log(`Ticket channel ${channel.name} deleted successfully`);
-            } catch (error) {
-                console.error('Error deleting ticket channel:', error);
-            }
-        }, 10000);
-
-    } catch (error) {
-        console.error('Error closing ticket:', error);
-        
-        try {
-            await interaction.editReply({
-                content: '❌ Failed to close ticket. Please try again.'
-            });
-        } catch (editError) {
-            console.error('Failed to edit reply:', editError);
-        }
-    }
-    break;
+                    case 'final_close_ticket':
+                        const { closeTicket } = require('../commands/staff/close-ticket.js');
+                        const { activeTickets } = require('../handlers/ticketHandlers.js');
+                        
+                        const channel = interaction.channel;
+                        const ticketData = activeTickets.get(channel.id);
+                        
+                        if (!ticketData) {
+                            return interaction.reply({
+                                content: '❌ Ticket data not found.',
+                                ephemeral: true
+                            });
+                        }
+                        
+                        await closeTicket(channel, interaction.user, ticketData, false);
+                        await interaction.reply({ content: '🔒 Closing ticket...', ephemeral: true });
+                        break;
                     default:
                         console.log(`Unknown button interaction: ${customId}`);
                         await safeReply(interaction, {
