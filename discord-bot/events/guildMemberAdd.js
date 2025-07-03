@@ -34,7 +34,7 @@ module.exports = {
                 console.error(`Guild: ${member.guild.name} (${member.guild.id})`);
 
                 try {
-                    await welcomeChannel.send(`Welcome ${member} to Creatok! Please check our rules and get started.`);
+                    await welcomeChannel.send(`Welcome ${member.displayName} to Creatok! Please check our rules and get started.`);
                     console.log('✅ Sent fallback welcome message');
                 } catch (fallbackError) {
                     console.error('❌ Even fallback message failed:', fallbackError.message);
@@ -50,7 +50,7 @@ module.exports = {
                     iconURL: client.user.displayAvatarURL() 
                 })
                .setDescription(
-                    `**Hey ${member}!**\n\n` +
+                    `**Hey ${member.displayName}!**\n\n` +
                     `Welcome to **Creatok** — your TikTok Shop journey starts here.\n\n` +
                     `💌 [Check your **DMs**](https://discord.com/channels/@me) to get started!`
                 )
@@ -69,7 +69,7 @@ module.exports = {
                     iconURL: client.user.displayAvatarURL() 
                 })
                 .setDescription(
-                    `**Hey ${member}!**\n\n` +
+                    `**Hey ${member.displayName}!**\n\n` +
                     `Welcome to **Creatok** — your TikTok Shop journey starts here.\n\n` +
                     `💌 [Check your **DMs**](https://discord.com/channels/@me) to get started!`
                 )
@@ -90,7 +90,7 @@ module.exports = {
                 console.error('❌ Failed to send welcome message:', messageError.message);
 
                 try {
-                    await welcomeChannel.send(`✨ **Hey ${member}!** Welcome to **Creatok** — [check your **DMs**](https://discord.com/channels/@me) to get started! 💌`);
+                    await welcomeChannel.send(`✨ **Hey ${member.displayName}!** Welcome to **Creatok** — [check your **DMs**](https://discord.com/channels/@me) to get started! 💌`);
                     console.log('✅ Text-only welcome message sent');
                 } catch (textError) {
                     console.error('❌ All welcome message attempts failed:', textError.message);
@@ -159,7 +159,7 @@ module.exports = {
             // Send STEP-BY-STEP welcome message via DM
             try {
                 await member.user.send({
-                    content: `**Start here ${member}!**`,
+                    content: `**Start here ${member.displayName}!**`,
                     embeds: [detailedWelcomeEmbed],
                     components: [guideRow, regionRow]
                 });
@@ -170,7 +170,7 @@ module.exports = {
                 // Fallback: Send detailed message in welcome channel if DM fails
                 try {
                     await welcomeChannel.send({
-                        content: `${member}, I couldn't DM you! Here's your step-by-step welcome guide:`,
+                        content: `${member.displayName}, I couldn't DM you! Here's your step-by-step welcome guide:`,
                         embeds: [detailedWelcomeEmbed],
                         components: [guideRow, regionRow]
                     });
@@ -223,7 +223,7 @@ module.exports = {
                             .setTimestamp();
 
                         const fallbackMessage = await rulesChannel.send({
-                            content: `${member}, please check your DMs for the rules. If you can't receive DMs, read them here and react with ✅:`,
+                            content: `${member.displayName}, please check your DMs for the rules. If you can't receive DMs, read them here and react with ✅:`,
                             embeds: [rulesEmbed]
                         });
 
